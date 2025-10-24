@@ -277,7 +277,7 @@ def main():
     
     # Model selection dropdown
     st.sidebar.subheader("Model Selection")
-    available_models = ["SVM", "Random Forest", "Gradient Boosting", "Naive Bayes", "Logistic Regression"]
+    available_models = ["SVM", "Random Forest", "Gradient Boosting", "Naive Bayes"]
     selected_model = st.sidebar.selectbox(
         "Select model for analysis",
         available_models,
@@ -522,6 +522,10 @@ def main():
                         The ROC curves show each model's performance across different classification thresholds.
                         Models with curves closer to the top-left corner perform better.
                     """)
+
+            # Transform test data to get probabilities for plots
+            X_test_vec = st.session_state.vectorizer.transform(X_test)
+            y_prob = st.session_state.model.predict_proba(X_test_vec)[:, 1]
 
             # Get metrics and plots for different thresholds
             metrics_df, roc_fig, metrics_fig = plot_threshold_metrics(y_test, y_prob)
