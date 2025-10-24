@@ -138,6 +138,80 @@ def plot_evaluation(eval_metrics: Dict) -> Dict[str, plt.Figure]:
     return plots
 
 
+def train_multiple_models(
+    messages,
+    labels,
+    random_state: int = 42,
+    test_size: float = 0.2,
+    cross_validate: bool = True
+) -> Dict:
+    """Train and evaluate multiple classifier models.
+    
+    Returns:
+        Dict containing trained models, vectorizer, and comparative metrics
+    """
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.naive_bayes import MultinomialNB
+    from sklearn.svm import SVC
+    
+    # Initialize vectorizer and transform data
+    vec = build_vectorizer()
+    X = vec.fit_transform(messages)
+    
+    # Split data
+    if len(messages) < 10:
+        X_train, y_train = X, labels
+        X_test, y_test = X, labels
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, labels, test_size=test_size,
+            stratify=labels, random_state=random_state
+        )
+    
+    # Define models to evaluate
+    models = {
+        'SVM': SVC(
+            kernel='rbf', C=10.0, gamma='scale',
+            probability=True, class_weight='balanced',
+            random_state=random_state, max_iter=1000
+        ),
+        'Random Forest': RandomForestClassifier(
+            n_estimators=100, class_weight='balanced',
+            random_state=random_state
+        ),
+        'Gradient Boosting': GradientBoostingClassifier(
+            n_estimators=100, random_state=random_state
+        ),
+        'Naive Bayes': MultinomialNB()
+    }
+    
+    # Train and evaluate each model
+    results = {}
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        eval_metrics = evaluate_model(model, X_test, y_test)
+        
+        if cross_validate and len(messages) >= 10:
+            cv_scores = cross_val_score(
+                model, X, labels, cv=5,
+                scoring="roc_auc"
+            )
+            eval_metrics["cross_val"] = {
+                "scores": cv_scores,
+                "mean": cv_scores.mean(),
+                "std": cv_scores.std()
+            }
+        
+        results[name] = {
+            'model': model,
+            'metrics': eval_metrics
+        }
+    
+    return {
+        'vectorizer': vec,
+        'models': results
+    }
+
 def train_model(
     messages,
     labels,
@@ -170,10 +244,16 @@ def train_model(
             stratify=labels, random_state=random_state
         )
 
-    model = LogisticRegression(
-        solver="liblinear",
-        class_weight="balanced",
-        random_state=random_state
+    # Use SVM with optimized parameters for better convergence
+    from sklearn.svm import SVC
+    model = SVC(
+        kernel='rbf',  # RBF kernel for non-linear data
+        C=10.0,       # Regularization parameter
+        gamma='scale', # Kernel coefficient
+        probability=True,  # Enable probability estimates
+        class_weight='balanced',  # Handle class imbalance
+        random_state=random_state,
+        max_iter=1000  # Increase max iterations for convergence
     )
     model.fit(X_train, y_train)
 

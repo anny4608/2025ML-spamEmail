@@ -18,7 +18,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from data import load_sms_dataset, normalize_labels
-from models import load_pipeline, train_model, plot_evaluation, save_pipeline
+from models import (
+    load_pipeline, train_model, plot_evaluation, save_pipeline,
+    evaluate_model, train_multiple_models
+)
 
 
 MODEL_PATH = os.environ.get("SPAM_MODEL_PATH", "models/spam_classifier.joblib")
@@ -270,7 +273,17 @@ def main():
     
     # Model directory
     st.sidebar.subheader("Models dir")
-    model_dir = st.sidebar.text_input("", "models", key="model_dir")
+    model_dir = st.sidebar.text_input("Models directory", "models", key="model_dir", label_visibility="collapsed")
+    
+    # Model selection dropdown
+    st.sidebar.subheader("Model Selection")
+    available_models = ["SVM", "Random Forest", "Gradient Boosting", "Naive Bayes", "Logistic Regression"]
+    selected_model = st.sidebar.selectbox(
+        "Select model for analysis",
+        available_models,
+        key="selected_model",
+        help="Choose which model to analyze and use for predictions"
+    )
     
     # Test size slider
     test_size = st.sidebar.slider("Test size", 0.1, 0.3, 0.2, 0.01)
@@ -321,15 +334,40 @@ def main():
                         st.warning("⚠️ No pre-trained model found. Training new model...")
                         show_loading_progress("Training in progress...")
                         
-                        # Train a new model
-                        vec, model, metrics = train_model(
+                        # Train multiple models
+                        results = train_multiple_models(
                             df["message"].tolist(),
                             df["label_num"].tolist(),
                             cross_validate=True
                         )
-                        pipeline = {"vectorizer": vec, "model": model}
-                        save_pipeline(vec, model, MODEL_PATH)
-                        st.success("✅ Model trained and saved successfully!")
+                        
+                        # Compare models and select the best one based on ROC AUC
+                        best_model_name = max(
+                            results['models'].keys(),
+                            key=lambda x: results['models'][x]['metrics']['roc']['auc']
+                        )
+                        
+                        st.success(f"✅ Models trained successfully! Best model: {best_model_name}")
+                        
+                        # Store all models and results in session state
+                        st.session_state.all_models = {
+                            'SVM': results['models']['SVM'],
+                            'Random Forest': results['models']['Random Forest'],
+                            'Gradient Boosting': results['models']['Gradient Boosting'],
+                            'Naive Bayes': results['models']['Naive Bayes'],
+                            'Logistic Regression': results['models'].get('Logistic Regression', None)
+                        }
+                        
+                        # Save the best model
+                        pipeline = {
+                            "vectorizer": results['vectorizer'],
+                            "model": results['models'][best_model_name]['model']
+                        }
+                        
+                        # Set the initial selected model
+                        st.session_state.selected_model = best_model_name
+                        save_pipeline(results['vectorizer'], pipeline["model"], MODEL_PATH)
+                        st.success(f"✅ Best model ({best_model_name}) saved successfully!")
                 
                 st.session_state.model = pipeline["model"]
                 st.session_state.vectorizer = pipeline["vectorizer"]
@@ -397,6 +435,103 @@ def main():
         st.subheader("Model Performance Metrics")
         
         if "model" in st.session_state:
+            
+            # Initialize model metrics
+            current_metrics = None
+            
+            # Update the active model based on selection
+            if "all_models" in st.session_state and selected_model in st.session_state.all_models:
+                st.session_state.model = st.session_state.all_models[selected_model]['model']
+                current_metrics = st.session_state.all_models[selected_model]['metrics']
+            elif "model" in st.session_state:
+                # Use the default model metrics
+                current_metrics = {
+                    'classification_report': {
+                        'accuracy': 0.0,
+                        '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}
+                    }
+                }
+                
+                # Display current model's key metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Accuracy", f"{current_metrics['classification_report']['accuracy']:.4f}")
+                with col2:
+                    st.metric("Precision", f"{current_metrics['classification_report']['1']['precision']:.4f}")
+                with col3:
+                    st.metric("Recall", f"{current_metrics['classification_report']['1']['recall']:.4f}")
+                with col4:
+                    st.metric("F1 Score", f"{current_metrics['classification_report']['1']['f1-score']:.4f}")
+                
+                st.markdown(f"### {selected_model} Model Performance Analysis")
+            # Add model comparison section if multiple models are available
+            if "all_models" in st.session_state:
+                st.markdown("### 📊 Model Comparison")
+                
+                # Create comparison dataframe
+                model_metrics = []
+                for model_name, model_info in st.session_state.all_models.items():
+                    metrics = model_info['metrics']
+                    model_metrics.append({
+                        'Model': model_name,
+                        'ROC AUC': metrics['roc']['auc'],
+                        'PR AUC': metrics['pr']['auc'],
+                        'Accuracy': metrics['classification_report']['accuracy'],
+                        'Precision': metrics['classification_report']['1']['precision'],
+                        'Recall': metrics['classification_report']['1']['recall'],
+                        'F1-Score': metrics['classification_report']['1']['f1-score']
+                    })
+                
+                comparison_df = pd.DataFrame(model_metrics)
+                
+                # Display comparison table
+                st.dataframe(
+                    comparison_df.style.background_gradient(cmap='viridis')
+                        .format({col: '{:.4f}' for col in comparison_df.columns if col != 'Model'})
+                )
+                
+                # Create ROC curve comparison
+                roc_fig = go.Figure()
+                for model_name, model_info in st.session_state.all_models.items():
+                    metrics = model_info['metrics']
+                    roc_fig.add_trace(go.Scatter(
+                        x=metrics['roc']['fpr'],
+                        y=metrics['roc']['tpr'],
+                        name=f"{model_name} (AUC={metrics['roc']['auc']:.3f})",
+                        mode='lines'
+                    ))
+                
+                roc_fig.add_trace(go.Scatter(
+                    x=[0, 1], y=[0, 1],
+                    name='Random',
+                    mode='lines',
+                    line=dict(color='gray', width=2, dash='dash')
+                ))
+                
+                roc_fig.update_layout(
+                    title='ROC Curves Comparison',
+                    xaxis_title='False Positive Rate',
+                    yaxis_title='True Positive Rate',
+                    template='plotly_dark',
+                    height=500,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(roc_fig, use_container_width=True)
+                
+                with st.expander("📖 Understanding Model Comparison"):
+                    st.markdown("""
+                        **Model Comparison Metrics:**
+                        - **ROC AUC**: Overall model discrimination ability (higher is better)
+                        - **PR AUC**: Performance on imbalanced datasets (higher is better)
+                        - **Accuracy**: Overall prediction accuracy
+                        - **Precision**: Accuracy of spam predictions
+                        - **Recall**: Ability to find all spam messages
+                        - **F1-Score**: Harmonic mean of precision and recall
+                        
+                        The ROC curves show each model's performance across different classification thresholds.
+                        Models with curves closer to the top-left corner perform better.
+                    """)
             from sklearn.model_selection import train_test_split
             
             # Split data
@@ -455,6 +590,18 @@ def main():
     with tabs[3]:
         st.subheader("🔍 Live Message Classification")
         
+        # Model selection for classification
+        if "all_models" in st.session_state:
+            model_names = list(st.session_state.all_models.keys())
+            selected_model_classify = st.selectbox(
+                "Select model for classification",
+                model_names,
+                key="selected_model_classify"
+            )
+            active_model = st.session_state.all_models[selected_model_classify]['model']
+        else:
+            active_model = st.session_state.model
+        
         # Example messages section
         st.markdown("### Try an Example")
         example_col1, example_col2 = st.columns(2)
@@ -481,7 +628,7 @@ def main():
             with st.spinner("Analyzing message..."):
                 # Transform input
                 X = st.session_state.vectorizer.transform([message])
-                proba = st.session_state.model.predict_proba(X)[0]
+                proba = active_model.predict_proba(X)[0]
                 prediction = "SPAM" if proba[1] >= threshold else "HAM"
                 
                 # Display prediction with custom styling
@@ -514,9 +661,21 @@ def main():
                 # Get importance for current message tokens
                 X_features = X.tocsr()
                 active_features = X_features.indices
+                
+                # Handle different model types for feature importance
+                if hasattr(active_model, 'coef_'):
+                    # For linear models (SVM, Logistic Regression)
+                    importance_values = active_model.coef_[0]
+                elif hasattr(active_model, 'feature_importances_'):
+                    # For tree-based models (Random Forest, Gradient Boosting)
+                    importance_values = active_model.feature_importances_
+                else:
+                    # For models without direct feature importance (Naive Bayes)
+                    importance_values = np.zeros(len(feature_importance['feature']))
+                    
                 importance = pd.DataFrame({
                     'feature': feature_importance['feature'].iloc[active_features],
-                    'importance': feature_importance['importance'].iloc[active_features] * X_features.data
+                    'importance': importance_values[active_features] * X_features.data
                 })
                 importance = importance.sort_values('importance', key=abs, ascending=False).head(10)
                 
