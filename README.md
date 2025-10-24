@@ -31,7 +31,7 @@ https://aisecurityhw3-2025ml-spamemail.streamlit.app/
   - Class distribution pie charts
   - ROC curves and AUC metrics
   - Performance metrics at different thresholds
-  - Feature importance analysis
+  
 
 - **Model Performance**:
   - Cross-validation metrics
@@ -79,8 +79,7 @@ streamlit run src\app_streamlit.py
 4. **Live Testing**
    - Real-time message classification
    - Probability scores
-   - Feature importance analysis
-   - Example message templates
+   
 
 Folder layout:
 
