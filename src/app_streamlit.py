@@ -435,17 +435,14 @@ def main():
                 stratify=df["label_num"]
             )
 
-            # Get model predictions
-            X_test_vec = st.session_state.vectorizer.transform(X_test)
-            y_prob = st.session_state.model.predict_proba(X_test_vec)[:, 1]
-            y_pred = (y_prob >= threshold).astype(int)
-
             # Calculate and display key metrics based on the selected threshold
-            st.markdown(f"### {selected_model} Performance (Threshold: {threshold:.2f})")
-            acc = accuracy_score(y_test, y_pred)
-            precision = precision_score(y_test, y_pred, zero_division=0)
-            recall = recall_score(y_test, y_pred, zero_division=0)
-            f1 = f1_score(y_test, y_pred, zero_division=0)
+            st.markdown(f"### {selected_model} Performance (at 0.5 Threshold)")
+
+            metrics = st.session_state.all_models[selected_model]['metrics']['classification_report']
+            acc = metrics['accuracy']
+            precision = metrics['1']['precision']
+            recall = metrics['1']['recall']
+            f1 = metrics['1']['f1-score']
 
             col1, col2, col3, col4 = st.columns(4)
             with col1:
