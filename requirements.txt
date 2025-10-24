@@ -1,19 +1,19 @@
 
 # build dependencies (must come first)
-setuptools>=69.0.0
-wheel>=0.42.0
-pip>=25.0.0
+setuptools==68.2.2
+wheel==0.41.2
+pip==23.2.1
 
 # pinned runtime deps (exact versions chosen for compatibility)
-numpy>=1.26.0,<2.0.0
-pandas>=2.0.0,<3.0.0
-scikit-learn>=1.0.0,<2.0.0
-nltk>=3.8.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-wordcloud>=1.9.0
-joblib>=1.1.0
-streamlit>=1.28.0
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.3.0
+nltk==3.8.1
+matplotlib==3.7.1
+seaborn==0.12.2
+wordcloud==1.9.2
+joblib==1.2.0
+streamlit==1.29.0
 
 # test & linting (optional to install via requirements-dev.txt)
 pytest==7.4.0
