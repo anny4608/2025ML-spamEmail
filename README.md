@@ -1,6 +1,15 @@
 # Advanced Spam Classification System
+This is an AiSecurity homework 3️⃣.
+The repository contains a sophisticated Spam Classification system with an interactive web interface, advanced visualizations, and comprehensive text preprocessing capabilities.
 
-This repository contains a sophisticated Spam Classification system with an interactive web interface, advanced visualizations, and comprehensive text preprocessing capabilities.
+
+## 🎵Source Reference
+This project builds upon patterns and datasets related to the Spam Email problem from Chapter 3 of the Packt repository below. We used it to expand the preprocessing steps and add richer visualization work (step outputs, metrics, and CLI/Streamlit views).
+
+https://github.com/PacktPublishing/Hands-On-Artificial-Intelligence-for-Cybersecurity.git
+
+## 💫Demo site
+https://aisecurityhw3-2025ml-spamemail.streamlit.app/
 
 ## 🌟 Features
 
