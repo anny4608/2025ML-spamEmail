@@ -326,51 +326,36 @@ def main():
                     - Text column: 'message' (SMS content)
                 """)
             
-            # Load or train model
-            if "model" not in st.session_state:
-                pipeline = load_model(MODEL_PATH)
-                if pipeline is None:
-                    with st.spinner("Training new model..."):
-                        st.warning("⚠️ No pre-trained model found. Training new model...")
-                        show_loading_progress("Training in progress...")
-                        
-                        # Train multiple models
-                        results = train_multiple_models(
-                            df["message"].tolist(),
-                            df["label_num"].tolist(),
-                            cross_validate=True
-                        )
-                        
-                        # Compare models and select the best one based on ROC AUC
-                        best_model_name = max(
-                            results['models'].keys(),
-                            key=lambda x: results['models'][x]['metrics']['roc']['auc']
-                        )
-                        
-                        st.success(f"✅ Models trained successfully! Best model: {best_model_name}")
-                        
-                        # Store all models and results in session state
-                        st.session_state.all_models = {
-                            'SVM': results['models']['SVM'],
-                            'Random Forest': results['models']['Random Forest'],
-                            'Gradient Boosting': results['models']['Gradient Boosting'],
-                            'Naive Bayes': results['models']['Naive Bayes'],
-                            'Logistic Regression': results['models'].get('Logistic Regression', None)
-                        }
-                        
-                        # Save the best model
-                        pipeline = {
-                            "vectorizer": results['vectorizer'],
-                            "model": results['models'][best_model_name]['model']
-                        }
-                        
-                        # Set the initial selected model
-                        st.session_state.selected_model = best_model_name
-                        save_pipeline(results['vectorizer'], pipeline["model"], MODEL_PATH)
-                        st.success(f"✅ Best model ({best_model_name}) saved successfully!")
-                
-                st.session_state.model = pipeline["model"]
-                st.session_state.vectorizer = pipeline["vectorizer"]
+            # Load or train models (once per session)
+            if "all_models" not in st.session_state:
+                with st.spinner("Training all models (once per session)..."):
+                    show_loading_progress("Training in progress...")
+                    
+                    # Train multiple models
+                    results = train_multiple_models(
+                        df["message"].tolist(),
+                        df["label_num"].tolist(),
+                        cross_validate=True
+                    )
+                    
+                    # Find the best model
+                    best_model_name = max(
+                        results['models'].keys(),
+                        key=lambda x: results['models'][x]['metrics']['roc']['auc']
+                    )
+                    
+                    st.success(f"✅ Models trained successfully! Best model: {best_model_name}")
+                    
+                    # Store all models and results in session state
+                    st.session_state.all_models = results['models']
+                    st.session_state.vectorizer = results['vectorizer']
+                    
+                    # Set the default model to the best one
+                    st.session_state.model = results['models'][best_model_name]['model']
+                    
+                    # Save the best model to disk
+                    save_pipeline(results['vectorizer'], st.session_state.model, MODEL_PATH)
+                    st.success(f"✅ Best model ({best_model_name}) saved to disk.")
                 
         except Exception as e:
             st.error("🚫 An error occurred!")
