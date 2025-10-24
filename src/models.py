@@ -170,6 +170,10 @@ def train_multiple_models(
     
     # Define models to evaluate
     models = {
+        'Logistic Regression': LogisticRegression(
+            solver='liblinear', class_weight='balanced',
+            random_state=random_state, max_iter=1000
+        ),
         'SVM': SVC(
             kernel='rbf', C=10.0, gamma='scale',
             probability=True, class_weight='balanced',
