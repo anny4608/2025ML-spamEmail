@@ -630,66 +630,7 @@ def main():
                     st.metric("Ham Probability", f"{proba[0]:.3f}", 
                              f"{'+' if proba[0] > 0.5 else ''}{(proba[0]-0.5)*200:.1f}%")
                 
-                # Feature importance analysis
-                st.markdown("### 🔬 Message Analysis")
 
-                # Handle different model types for feature importance
-                if hasattr(active_model, 'coef_'):
-                    # For linear models (e.g., Logistic Regression, Linear SVM)
-                    importance_values = active_model.coef_[0]
-                elif hasattr(active_model, 'feature_importances_'):
-                    # For tree-based models (e.g., Random Forest, Gradient Boosting)
-                    importance_values = active_model.feature_importances_
-                else:
-                    st.warning(f"Feature importance analysis is not available for the '{selected_model_classify}' model.")
-                    importance_values = None
-
-                if importance_values is not None:
-                    feature_importance = pd.DataFrame({
-                        'feature': st.session_state.vectorizer.get_feature_names_out(),
-                        'importance': importance_values
-                    })
-
-                    # Get importance for current message tokens
-                    X_features = X.tocsr()
-                    active_features = X_features.indices
-
-                    importance = pd.DataFrame({
-                        'feature': feature_importance['feature'].iloc[active_features],
-                        'importance': importance_values[active_features] * X_features.data
-                    })
-                    importance = importance.sort_values('importance', key=abs, ascending=False).head(10)
-
-                    # Create interactive importance plot
-                    imp_fig = go.Figure()
-                    imp_fig.add_trace(go.Bar(
-                        x=importance['importance'],
-                        y=importance['feature'],
-                        orientation='h',
-                        marker_color=['red' if x < 0 else 'green' for x in importance['importance']]
-                    ))
-                    imp_fig.update_layout(
-                        title='Top Contributing Words',
-                        xaxis_title='Impact on Classification',
-                        yaxis_title='Word',
-                        template='plotly_dark',
-                        height=400
-                    )
-                    st.plotly_chart(imp_fig, use_container_width=True)
-                
-                with st.expander("📖 Understanding the Results"):
-                    st.markdown("""
-                        **How to interpret these results:**
-                        
-                        1. **Prediction**: Shows whether the message is classified as SPAM or HAM
-                        2. **Probabilities**: 
-                           - Above 0.5 indicates higher confidence
-                           - Numbers closer to 1.0 mean stronger confidence
-                        3. **Word Impact**:
-                           - Green bars show words suggesting legitimate messages
-                           - Red bars show words suggesting spam
-                           - Longer bars mean stronger influence
-                    """)
 
 
 if __name__ == "__main__":
