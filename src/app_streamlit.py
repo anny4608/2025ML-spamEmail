@@ -433,41 +433,49 @@ def main():
     
     with tabs[2]:
         st.subheader("Model Performance Metrics")
-        
+
         if "model" in st.session_state:
-            
-            # Initialize model metrics
-            current_metrics = None
-            
-            # Update the active model based on selection
+            from sklearn.model_selection import train_test_split
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+            # Always use the model selected in the sidebar
             if "all_models" in st.session_state and selected_model in st.session_state.all_models:
                 st.session_state.model = st.session_state.all_models[selected_model]['model']
-                current_metrics = st.session_state.all_models[selected_model]['metrics']
-            elif "model" in st.session_state:
-                # Use the default model metrics
-                current_metrics = {
-                    'classification_report': {
-                        'accuracy': 0.0,
-                        '1': {'precision': 0.0, 'recall': 0.0, 'f1-score': 0.0}
-                    }
-                }
-                
-                # Display current model's key metrics
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Accuracy", f"{current_metrics['classification_report']['accuracy']:.4f}")
-                with col2:
-                    st.metric("Precision", f"{current_metrics['classification_report']['1']['precision']:.4f}")
-                with col3:
-                    st.metric("Recall", f"{current_metrics['classification_report']['1']['recall']:.4f}")
-                with col4:
-                    st.metric("F1 Score", f"{current_metrics['classification_report']['1']['f1-score']:.4f}")
-                
-                st.markdown(f"### {selected_model} Model Performance Analysis")
+
+            # Split data for evaluation
+            X_train, X_test, y_train, y_test = train_test_split(
+                df["message"], df["label_num"],
+                test_size=test_size,
+                random_state=seed,
+                stratify=df["label_num"]
+            )
+
+            # Get model predictions
+            X_test_vec = st.session_state.vectorizer.transform(X_test)
+            y_prob = st.session_state.model.predict_proba(X_test_vec)[:, 1]
+            y_pred = (y_prob >= threshold).astype(int)
+
+            # Calculate and display key metrics based on the selected threshold
+            st.markdown(f"### {selected_model} Performance (Threshold: {threshold:.2f})")
+            acc = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred, zero_division=0)
+            recall = recall_score(y_test, y_pred, zero_division=0)
+            f1 = f1_score(y_test, y_pred, zero_division=0)
+
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Accuracy", f"{acc:.4f}")
+            with col2:
+                st.metric("Precision", f"{precision:.4f}")
+            with col3:
+                st.metric("Recall", f"{recall:.4f}")
+            with col4:
+                st.metric("F1 Score", f"{f1:.4f}")
+
             # Add model comparison section if multiple models are available
             if "all_models" in st.session_state:
                 st.markdown("### 📊 Model Comparison")
-                
+
                 # Create comparison dataframe
                 model_metrics = []
                 for model_name, model_info in st.session_state.all_models.items():
@@ -481,34 +489,34 @@ def main():
                         'Recall': metrics['classification_report']['1']['recall'],
                         'F1-Score': metrics['classification_report']['1']['f1-score']
                     })
-                
+
                 comparison_df = pd.DataFrame(model_metrics)
-                
+
                 # Display comparison table
                 st.dataframe(
                     comparison_df.style.background_gradient(cmap='viridis')
                         .format({col: '{:.4f}' for col in comparison_df.columns if col != 'Model'})
                 )
-                
+
                 # Create ROC curve comparison
-                roc_fig = go.Figure()
+                roc_fig_comp = go.Figure()
                 for model_name, model_info in st.session_state.all_models.items():
                     metrics = model_info['metrics']
-                    roc_fig.add_trace(go.Scatter(
+                    roc_fig_comp.add_trace(go.Scatter(
                         x=metrics['roc']['fpr'],
                         y=metrics['roc']['tpr'],
                         name=f"{model_name} (AUC={metrics['roc']['auc']:.3f})",
                         mode='lines'
                     ))
-                
-                roc_fig.add_trace(go.Scatter(
+
+                roc_fig_comp.add_trace(go.Scatter(
                     x=[0, 1], y=[0, 1],
                     name='Random',
                     mode='lines',
                     line=dict(color='gray', width=2, dash='dash')
                 ))
-                
-                roc_fig.update_layout(
+
+                roc_fig_comp.update_layout(
                     title='ROC Curves Comparison',
                     xaxis_title='False Positive Rate',
                     yaxis_title='True Positive Rate',
@@ -516,9 +524,9 @@ def main():
                     height=500,
                     showlegend=True
                 )
-                
-                st.plotly_chart(roc_fig, use_container_width=True)
-                
+
+                st.plotly_chart(roc_fig_comp, use_container_width=True)
+
                 with st.expander("📖 Understanding Model Comparison"):
                     st.markdown("""
                         **Model Comparison Metrics:**
@@ -528,27 +536,14 @@ def main():
                         - **Precision**: Accuracy of spam predictions
                         - **Recall**: Ability to find all spam messages
                         - **F1-Score**: Harmonic mean of precision and recall
-                        
+
                         The ROC curves show each model's performance across different classification thresholds.
                         Models with curves closer to the top-left corner perform better.
                     """)
-            from sklearn.model_selection import train_test_split
-            
-            # Split data
-            X_train, X_test, y_train, y_test = train_test_split(
-                df["message"], df["label_num"], 
-                test_size=test_size, 
-                random_state=seed,
-                stratify=df["label_num"]
-            )
-            
-            # Transform test data
-            X_test_vec = st.session_state.vectorizer.transform(X_test)
-            y_prob = st.session_state.model.predict_proba(X_test_vec)[:, 1]
-            
-            # Get metrics and plots
+
+            # Get metrics and plots for different thresholds
             metrics_df, roc_fig, metrics_fig = plot_threshold_metrics(y_test, y_prob)
-            
+
             # Display metrics in an attractive way
             st.markdown("### 📊 Performance at Different Thresholds")
             styled_df = metrics_df.style.background_gradient(cmap='viridis')
@@ -560,13 +555,13 @@ def main():
                 'accuracy': lambda x: '{:.4f}'.format(x)
             })
             st.dataframe(styled_df)
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.plotly_chart(roc_fig, use_container_width=True)
             with col2:
                 st.plotly_chart(metrics_fig, use_container_width=True)
-            
+
             with st.expander("📖 Understanding the Metrics"):
                 st.markdown("""
                     **Metrics Explanation:**
@@ -574,18 +569,17 @@ def main():
                     - **Precision**: Accuracy of spam predictions
                     - **Recall**: Ability to find all spam messages
                     - **F1 Score**: Balance between precision and recall
-                    
+
                     **ROC Curve:**
                     - Shows tradeoff between true and false positive rates
                     - Closer to top-left corner is better
                     - AUC (Area Under Curve) of 1.0 is perfect
-                    
+
                     **Threshold Selection:**
                     - Higher threshold = fewer spam predictions but more confident
                     - Lower threshold = more spam predictions but less confident
                     - Choose based on your tolerance for false positives
                 """)
-        # This section is already handled above, no need for duplicate code
     
     with tabs[3]:
         st.subheader("🔍 Live Message Classification")
