@@ -1,5 +1,5 @@
 # Advanced Spam Classification System
-This is an AiSecurity homework 2.
+This is an AiSecurity homework 3️⃣.
 The repository contains a sophisticated Spam Classification system with an interactive web interface, advanced visualizations, and comprehensive text preprocessing capabilities.
 
 
@@ -9,7 +9,7 @@ This project builds upon patterns and datasets related to the Spam Email problem
 https://github.com/PacktPublishing/Hands-On-Artificial-Intelligence-for-Cybersecurity.git
 
 ## 💫Demo site
-https://aisecurityhw2-2025ml-spamemail.streamlit.app/
+https://aisecurityhw3-2025ml-spamemail.streamlit.app/
 
 ## 🌟 Features
 
