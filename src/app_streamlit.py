@@ -632,49 +632,50 @@ def main():
                 
                 # Feature importance analysis
                 st.markdown("### 🔬 Message Analysis")
-                
-                feature_importance = pd.DataFrame({
-                    'feature': st.session_state.vectorizer.get_feature_names_out(),
-                    'importance': st.session_state.model.coef_[0]
-                })
-                
-                # Get importance for current message tokens
-                X_features = X.tocsr()
-                active_features = X_features.indices
-                
+
                 # Handle different model types for feature importance
                 if hasattr(active_model, 'coef_'):
-                    # For linear models (SVM, Logistic Regression)
+                    # For linear models (e.g., Logistic Regression, Linear SVM)
                     importance_values = active_model.coef_[0]
                 elif hasattr(active_model, 'feature_importances_'):
-                    # For tree-based models (Random Forest, Gradient Boosting)
+                    # For tree-based models (e.g., Random Forest, Gradient Boosting)
                     importance_values = active_model.feature_importances_
                 else:
-                    # For models without direct feature importance (Naive Bayes)
-                    importance_values = np.zeros(len(feature_importance['feature']))
-                    
-                importance = pd.DataFrame({
-                    'feature': feature_importance['feature'].iloc[active_features],
-                    'importance': importance_values[active_features] * X_features.data
-                })
-                importance = importance.sort_values('importance', key=abs, ascending=False).head(10)
-                
-                # Create interactive importance plot
-                imp_fig = go.Figure()
-                imp_fig.add_trace(go.Bar(
-                    x=importance['importance'],
-                    y=importance['feature'],
-                    orientation='h',
-                    marker_color=['red' if x < 0 else 'green' for x in importance['importance']]
-                ))
-                imp_fig.update_layout(
-                    title='Top Contributing Words',
-                    xaxis_title='Impact on Classification',
-                    yaxis_title='Word',
-                    template='plotly_dark',
-                    height=400
-                )
-                st.plotly_chart(imp_fig, use_container_width=True)
+                    st.warning(f"Feature importance analysis is not available for the '{selected_model_classify}' model.")
+                    importance_values = None
+
+                if importance_values is not None:
+                    feature_importance = pd.DataFrame({
+                        'feature': st.session_state.vectorizer.get_feature_names_out(),
+                        'importance': importance_values
+                    })
+
+                    # Get importance for current message tokens
+                    X_features = X.tocsr()
+                    active_features = X_features.indices
+
+                    importance = pd.DataFrame({
+                        'feature': feature_importance['feature'].iloc[active_features],
+                        'importance': importance_values[active_features] * X_features.data
+                    })
+                    importance = importance.sort_values('importance', key=abs, ascending=False).head(10)
+
+                    # Create interactive importance plot
+                    imp_fig = go.Figure()
+                    imp_fig.add_trace(go.Bar(
+                        x=importance['importance'],
+                        y=importance['feature'],
+                        orientation='h',
+                        marker_color=['red' if x < 0 else 'green' for x in importance['importance']]
+                    ))
+                    imp_fig.update_layout(
+                        title='Top Contributing Words',
+                        xaxis_title='Impact on Classification',
+                        yaxis_title='Word',
+                        template='plotly_dark',
+                        height=400
+                    )
+                    st.plotly_chart(imp_fig, use_container_width=True)
                 
                 with st.expander("📖 Understanding the Results"):
                     st.markdown("""
